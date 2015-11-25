@@ -31,17 +31,13 @@ delta cogh = allways $ do
   timeRef = rTime cogh
 
 eventInput :: CoghWorld -> GearInput Event
-eventInput cogh = GearInput eventInput'
+eventInput cogh = GearInput $ eventInput' []
  where
-  eventInput' o = do
+  eventInput' es = do
     me <- nextEvent (window cogh)
     case me of
-      Just e -> do
-        loop <- o e
-        case loop of
-          GearContinue -> eventInput' o
-          GearFinish -> return GearFinish
-      Nothing -> return GearContinue
+      Just e -> eventInput' (return e : es)
+      Nothing -> return es
 
 data Input
   = Delta Double

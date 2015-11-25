@@ -10,42 +10,33 @@ module FRP.Gearh
   ) where
 
 import Control.Monad
-import Data.IORef
 
-newtype GearInput a = GearInput (GearOutput a -> IO GearLoop)
+newtype GearInput a = GearInput (IO [IO a])
 
 type GearOutput a = a -> IO GearLoop
 
 data GearLoop = GearContinue | GearFinish
 
 instance Functor GearInput where
-  fmap f (GearInput i) = GearInput $ \ o -> i (o . f)
+  fmap f (GearInput i) = GearInput ((fmap . fmap . fmap) f i)
 
 merge :: [GearInput a] -> GearInput a
-merge inputs = GearInput $ \ o ->
-  let
-    f loop (GearInput i) = case loop of
-      GearContinue -> i o
-      GearFinish -> return GearFinish
-  in foldM f GearContinue inputs
+merge inputs =
+  GearInput $ fmap concat $ sequence $ fmap (\ (GearInput i) -> i) inputs
 
 allways :: IO a -> GearInput a
-allways io = GearInput $ \ o -> do
-  a <- io
-  o a
+allways io = GearInput $ return [io]
 
 sometimes :: IO (Maybe a) -> GearInput a
-sometimes io = GearInput $ \ o -> do
+sometimes io = GearInput $ do
   ma <- io
-  case ma of
-    Just a -> o a
-    Nothing -> return GearContinue
+  return $ case ma of
+    Just a -> [return a]
+    Nothing -> []
 
 addIO :: (a -> IO b) -> GearInput a -> GearInput b
-addIO io (GearInput i) = GearInput $ \ o ->
-  i $ \ a -> do
-    b <- io a
-    o b
+addIO io (GearInput i) =
+  GearInput (fmap (fmap (>>= io)) i)
 
 runGear
   :: GearInput input
@@ -53,20 +44,19 @@ runGear
   -> state
   -> (state -> input -> (state, output))
   -> IO ()
-runGear (GearInput i) o initialState f = do
-  stateRef <- newIORef initialState
+runGear (GearInput isIo) o initialState f =
+  run initialState
+ where
+  inputLoop (oldState, GearContinue) i = do
+    input <- i
+    let (newState, output) = f oldState input
+    loop <- o output
+    return (newState, loop)
+  inputLoop (oldState, GearFinish) _ = return (oldState, GearFinish)
 
-  let
-    inputIO input = do
-      oldState <- readIORef stateRef
-      let (newState, output) = f oldState input
-      writeIORef stateRef newState
-      o output
-
-    run = do
-      loop <- i inputIO
-      case loop of
-        GearContinue -> run
-        GearFinish -> return ()
-
-  run
+  run oldState = do
+    is <- isIo
+    (newState, loop) <- foldM inputLoop (oldState, GearContinue) is
+    case loop of
+      GearContinue -> run newState
+      GearFinish -> return ()
