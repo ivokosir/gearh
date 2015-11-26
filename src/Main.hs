@@ -47,10 +47,10 @@ data Result
   = Render
   | Update
   | Log String
-  | Exit
+  | Exit Int
 
 update :: Int -> Input -> (Int, Result)
-update state (EventInput Quit) = (state, Exit)
+update state (EventInput Quit) = (state, Exit state)
 update state (EventInput (MouseButton _ True _)) = (state+1, Log (show state))
 update state (EventInput _) = (state, Update)
 update state (Delta _) = (state, Render)
@@ -74,10 +74,11 @@ main = do
           swapBuffers (window cogh)
         Update -> return ()
         Log s -> putStrLn s
-        Exit -> deleteWindow (window cogh)
+        Exit _ -> deleteWindow (window cogh)
 
       return $ case result of
-        Exit -> GearFinish
+        Exit clicks -> GearFinish clicks
         _ -> GearContinue
 
-  runGear input output initialState update
+  clicks <- runGear input output initialState update
+  print clicks

@@ -11,11 +11,11 @@ module FRP.Gearh
 
 import Control.Monad
 
-newtype GearInput a = GearInput (IO [IO a])
+newtype GearInput input = GearInput (IO [IO input])
 
-type GearOutput a = a -> IO GearLoop
+type GearOutput input result = input -> IO (GearLoop result)
 
-data GearLoop = GearContinue | GearFinish
+data GearLoop result = GearContinue | GearFinish result
 
 instance Functor GearInput where
   fmap f (GearInput i) = GearInput ((fmap . fmap . fmap) f i)
@@ -40,10 +40,10 @@ addIO io (GearInput i) =
 
 runGear
   :: GearInput input
-  -> GearOutput output
+  -> GearOutput output result
   -> state
   -> (state -> input -> (state, output))
-  -> IO ()
+  -> IO result
 runGear (GearInput isIo) o initialState f =
   run initialState
  where
@@ -52,11 +52,11 @@ runGear (GearInput isIo) o initialState f =
     let (newState, output) = f oldState input
     loop <- o output
     return (newState, loop)
-  inputLoop (oldState, GearFinish) _ = return (oldState, GearFinish)
+  inputLoop (oldState, finish) _ = return (oldState, finish)
 
   run oldState = do
     is <- isIo
     (newState, loop) <- foldM inputLoop (oldState, GearContinue) is
     case loop of
       GearContinue -> run newState
-      GearFinish -> return ()
+      GearFinish result -> return result
