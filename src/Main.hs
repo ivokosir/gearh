@@ -50,23 +50,39 @@ data Result
   | Log String
   | Exit Int
 
-update :: Int -> Input -> (Int, Result)
-update state (EventInput Quit) = (state, Exit state)
-update state (EventInput (MouseButton _ True _)) = (state+1, Log (show state))
+data State = State
+  { x :: Int
+  , y :: Int
+  , clicks :: Int
+  } deriving (Show)
+
+update :: State -> Input -> (State, Result)
+update state (EventInput Quit) = (state, Exit (clicks state))
+update state (EventInput (MouseButton _ True _)) =
+  (newState, Log (show newState))
+ where
+  newState = state { clicks = clicks state +1 }
+update state (EventInput (MousePosition mx my)) = (newState, Update)
+ where
+  newState = state { x = mx, y = my }
 update state (EventInput _) = (state, Update)
-update state (Delta _) = (state, Render renderScene)
+update state (Delta _) = (state, Render (renderScene (x state) (y state)))
 
-renderScene :: Element
-renderScene =
-  move 100 100 $ group
-    [ rectangle 200 200 0xFF0000FF
-    , move 200 200 $ rectangle 200 200 0x00FF00FF
-    , move 90 210 $ rectangle 100 100 0x0000FFFF
-    , move 100 100 $ rectangle 200 200 0xFFFFFF44
+renderScene :: Int -> Int -> Element
+renderScene centerX centerY =
+  move centerX centerY $ group
+    [ move (-w2) (-h2) $ rectangle w2 h2 0xFF0000FF
+    , rectangle w2 h2 0x00FF00FF
+    , move (-110) 10 $ rectangle 100 100 0x0000FFFF
+    , move (-w4) (-h4) $ rectangle w2 h2 0xFFFFFF44
     ]
+ where
+  (w, h) = (400, 400)
+  (w2, h2) = (div w 2, div h 2)
+  (w4, h4) = (div w 4, div h 4)
 
-initialState :: Int
-initialState = 0
+initialState :: State
+initialState = State 0 0 0
 
 main :: IO ()
 main = do
@@ -88,8 +104,8 @@ main = do
         Exit _ -> deleteWindow (window cogh)
 
       return $ case result of
-        Exit clicks -> GearFinish clicks
+        Exit clicksReturn -> GearFinish clicksReturn
         _ -> GearContinue
 
-  clicks <- runGear input output initialState update
-  print clicks
+  clicksReturn <- runGear input output initialState update
+  putStrLn ("return value: " ++ show clicksReturn)
