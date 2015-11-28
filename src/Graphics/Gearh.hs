@@ -48,8 +48,8 @@ group es = Element render
    where
     renderElement (Element r) = r matrix window
 
-move :: Element -> X -> Y -> Element
-move (Element r) dx dy = Element render
+move :: X -> Y -> Element -> Element
+move dx dy (Element r) = Element render
  where
   render (Matrix x y) =
     r (Matrix (x + dx) (y + dy))

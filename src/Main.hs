@@ -6,6 +6,7 @@ import Data.Word
 import Graphics.Cogh
 
 import FRP.Gearh
+import Graphics.Gearh
 
 data CoghWorld = CoghWorld
   { window :: Window
@@ -44,7 +45,7 @@ data Input
   | EventInput Event
 
 data Result
-  = Render
+  = Render Element
   | Update
   | Log String
   | Exit Int
@@ -53,7 +54,16 @@ update :: Int -> Input -> (Int, Result)
 update state (EventInput Quit) = (state, Exit state)
 update state (EventInput (MouseButton _ True _)) = (state+1, Log (show state))
 update state (EventInput _) = (state, Update)
-update state (Delta _) = (state, Render)
+update state (Delta _) = (state, Render renderScene)
+
+renderScene :: Element
+renderScene =
+  move 100 100 $ group
+    [ rectangle 200 200 0xFF0000FF
+    , move 200 200 $ rectangle 200 200 0x00FF00FF
+    , move 90 210 $ rectangle 100 100 0x0000FFFF
+    , move 100 100 $ rectangle 200 200 0xFFFFFF44
+    ]
 
 initialState :: Int
 initialState = 0
@@ -69,8 +79,9 @@ main = do
     output result = do
 
       case result of
-        Render -> do
+        Render root -> do
           clear (window cogh)
+          renderRoot (window cogh) root
           swapBuffers (window cogh)
         Update -> return ()
         Log s -> putStrLn s
