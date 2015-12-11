@@ -1,12 +1,10 @@
 module Main where
 
---import Control.Concurrent
 import Data.IORef
 import Data.Word
 import Graphics.Cogh
 
 import FRP.Gearh
-import Graphics.Gearh
 
 data CoghWorld = CoghWorld
   { window :: Window
@@ -32,13 +30,9 @@ delta cogh = allways $ do
   timeRef = rTime cogh
 
 eventInput :: CoghWorld -> GearInput Event
-eventInput cogh = GearInput $ eventInput' []
- where
-  eventInput' es = do
-    me <- nextEvent (window cogh)
-    case me of
-      Just e -> eventInput' (return e : es)
-      Nothing -> return es
+eventInput cogh = GearInput $ do
+  es <- getEvents (window cogh)
+  return $ fmap return es
 
 data Input
   = Delta Double
@@ -95,10 +89,7 @@ main = do
     output result = do
 
       case result of
-        Render root -> do
-          clear (window cogh)
-          renderRoot (window cogh) root
-          swapBuffers (window cogh)
+        Render root -> renderRoot (window cogh) root
         Update -> return ()
         Log s -> putStrLn s
         Exit _ -> deleteWindow (window cogh)

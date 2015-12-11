@@ -28,6 +28,4 @@ executable gearh
   -- other-extensions:
 
   other-modules:
-    FRP.Gearh,
-    Graphics.Gearh
-
+    FRP.Gearh
