@@ -10,33 +10,29 @@ module FRP.Gearh
   ) where
 
 import Control.Monad
+import Data.Maybe
 
-newtype GearInput input = GearInput (IO [IO input])
+newtype GearInput input = GearInput (IO [input])
 
 type GearOutput input result = input -> IO (GearLoop result)
 
 data GearLoop result = GearContinue | GearFinish result
 
 instance Functor GearInput where
-  fmap f (GearInput i) = GearInput ((fmap . fmap . fmap) f i)
+  fmap f (GearInput i) = GearInput $ (fmap . fmap) f i
 
 merge :: [GearInput a] -> GearInput a
-merge inputs =
-  GearInput $ fmap concat $ sequence $ fmap (\ (GearInput i) -> i) inputs
+merge inputs = GearInput $
+  fmap concat $ sequence $ fmap (\ (GearInput i) -> i) inputs
 
 allways :: IO a -> GearInput a
-allways io = GearInput $ return [io]
+allways io = GearInput $ fmap (:[]) io
 
 sometimes :: IO (Maybe a) -> GearInput a
-sometimes io = GearInput $ do
-  ma <- io
-  return $ case ma of
-    Just a -> [return a]
-    Nothing -> []
+sometimes io = GearInput $ fmap maybeToList io
 
 addIO :: (a -> IO b) -> GearInput a -> GearInput b
-addIO io (GearInput i) =
-  GearInput (fmap (fmap (>>= io)) i)
+addIO io (GearInput i) = GearInput $ i >>= mapM io
 
 runGear
   :: GearInput input
@@ -47,8 +43,7 @@ runGear
 runGear (GearInput isIo) o initialState f =
   run initialState
  where
-  inputLoop (oldState, GearContinue) i = do
-    input <- i
+  inputLoop (oldState, GearContinue) input = do
     let (newState, output) = f oldState input
     loop <- o output
     return (newState, loop)

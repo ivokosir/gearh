@@ -30,9 +30,7 @@ delta cogh = allways $ do
   timeRef = rTime cogh
 
 eventInput :: CoghWorld -> GearInput Event
-eventInput cogh = GearInput $ do
-  es <- getEvents (window cogh)
-  return $ fmap return es
+eventInput cogh = GearInput $ getEvents $ window cogh
 
 data Input
   = Delta Double
