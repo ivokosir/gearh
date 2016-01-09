@@ -4,8 +4,7 @@ module FRP.Gearh
   , allways
   , sometimes
   , addIO
-  , GearOutput
-  , GearLoop(..)
+  , GearOutput(..)
   , runGear
   ) where
 
@@ -13,10 +12,6 @@ import Control.Monad
 import Data.Maybe
 
 newtype GearInput input = GearInput (IO [input])
-
-type GearOutput input result = input -> IO (GearLoop result)
-
-data GearLoop result = GearContinue | GearFinish result
 
 instance Functor GearInput where
   fmap f (GearInput i) = GearInput $ (fmap . fmap) f i
@@ -34,24 +29,35 @@ sometimes io = GearInput $ fmap maybeToList io
 addIO :: (a -> IO b) -> GearInput a -> GearInput b
 addIO io (GearInput i) = GearInput $ i >>= mapM io
 
+data GearOutput state result
+  = GearAction (IO ())
+  | GearUpdate state
+  | GearUpdateAction state (IO ())
+  | GearFinish result
+
 runGear
   :: GearInput input
-  -> GearOutput output result
   -> state
-  -> (state -> input -> (state, output))
+  -> (state -> input -> GearOutput state result)
   -> IO result
-runGear (GearInput isIo) o initialState f =
+runGear (GearInput isIo) initialState f =
   run initialState
  where
-  inputLoop (oldState, GearContinue) input = do
-    let (newState, output) = f oldState input
-    loop <- o output
-    return (newState, loop)
-  inputLoop (oldState, finish) _ = return (oldState, finish)
+  inputLoop (Right oldState) input =
+    case f oldState input of
+      (GearAction action) -> do
+        action
+        return (Right oldState)
+      (GearUpdate newState) -> return (Right newState)
+      (GearUpdateAction newState action) -> do
+        action
+        return (Right newState)
+      (GearFinish result) -> return (Left result)
+  inputLoop (Left result) _ = return (Left result)
 
   run oldState = do
     is <- isIo
-    (newState, loop) <- foldM inputLoop (oldState, GearContinue) is
-    case loop of
-      GearContinue -> run newState
-      GearFinish result -> return result
+    stateOrResult <- foldM inputLoop (Right oldState) is
+    case stateOrResult of
+      Right newState -> run newState
+      Left result -> return result

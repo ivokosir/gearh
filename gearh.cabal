@@ -15,17 +15,25 @@ cabal-version: >=1.10
 
 -- extra-source-files:
 
-executable gearh
+library
   hs-source-dirs:   src
-  main-is:          Main.hs
+  default-language: Haskell2010
+  ghc-options:      -Wall
+
+  build-depends:
+    base >=4.8 && <4.9
+
+  -- other-extensions:
+
+  exposed-modules:
+    FRP.Gearh
+
+executable renderWithReturn
+  main-is:          test/renderWithReturn.hs
   default-language: Haskell2010
   ghc-options:      -Wall
 
   build-depends:
     base >=4.8 && <4.9,
+    gearh,
     cogh
-
-  -- other-extensions:
-
-  other-modules:
-    FRP.Gearh
