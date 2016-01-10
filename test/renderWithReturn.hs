@@ -1,19 +1,18 @@
 module Main where
 
-import Data.Word
 import Graphics.Cogh
 
 import FRP.Gearh
 
-delta :: Window -> GearInput Window
-delta window = allways $ return window
+renderInput
+  :: Window
+  -> (s -> Element)
+  -> Input (s -> Output s r)
+renderInput window getElement =
+  allways $ return $ \ state -> action $ renderRoot window $ getElement state
 
-eventInput :: Window -> GearInput Event
-eventInput window = GearInput $ getEvents $ window
-
-data Input
-  = Delta Window
-  | EventInput Event
+eventInput :: Window -> Input Event
+eventInput = Input . getEvents
 
 data State = State
   { x :: Int
@@ -21,17 +20,19 @@ data State = State
   , clicks :: Int
   } deriving (Show)
 
-update :: State -> Input -> GearOutput State Int
-update state (EventInput Quit) = GearFinish (clicks state)
-update state (EventInput (MouseButton _ True _)) =
-  GearUpdateAction newState (putStrLn (show newState))
+updateEvent :: Event -> State -> Output State Int
+updateEvent Quit state = finish (clicks state)
+updateEvent (MouseButton _ True _) state =
+  updateAndAction newState (print newState)
  where
   newState = state { clicks = clicks state +1 }
-update state (EventInput (MousePosition mx my)) = GearUpdate newState
+updateEvent (MousePosition mx my) state  = update newState
  where
   newState = state { x = mx, y = my }
-update state (EventInput _) = GearUpdate state
-update state (Delta window) = GearAction (renderRoot window (renderScene (x state) (y state)))
+updateEvent _ _  = continue
+
+render :: State -> Element
+render state = renderScene (x state) (y state)
 
 renderScene :: Int -> Int -> Element
 renderScene centerX centerY =
@@ -55,9 +56,9 @@ main = do
 
   let
     input = merge
-      [ fmap EventInput (eventInput window)
-      , fmap Delta (delta window)
+      [ fmap updateEvent (eventInput window)
+      , renderInput window render
       ]
 
-  clicksReturn <- runGear input initialState update
+  clicksReturn <- runGear input initialState
   putStrLn ("return value: " ++ show clicksReturn)
