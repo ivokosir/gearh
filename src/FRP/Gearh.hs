@@ -34,29 +34,29 @@ sometimes io = Input $ fmap maybeToList io
 addIO :: (a -> IO b) -> Input a -> Input b
 addIO io (Input i) = Input $ i >>= mapM io
 
-data Output s r
+data Output s
   = Continue (Maybe s) (Maybe (IO ()))
-  | Finish r
+  | Finish
 
-update :: s -> Output s r
+update :: s -> Output s
 update state = Continue (Just state) Nothing
 
-action :: IO () -> Output s r
+action :: IO () -> Output s
 action io = Continue Nothing (Just io)
 
-updateAndAction :: s -> IO () -> Output s r
+updateAndAction :: s -> IO () -> Output s
 updateAndAction state io = Continue (Just state) (Just io)
 
-continue :: Output s r
+continue :: Output s
 continue = Continue Nothing Nothing
 
-finish :: r -> Output s r
+finish :: Output s
 finish = Finish
 
 runGear
-  :: Input (s -> Output s r)
+  :: Input (s -> Output s)
   -> s
-  -> IO r
+  -> IO s
 runGear (Input isIO) initialState =
   run initialState
  where
@@ -65,12 +65,12 @@ runGear (Input isIO) initialState =
       (Continue mState mIO) -> do
         fromMaybe (return ()) mIO
         return $ Right $ fromMaybe oldState mState
-      (Finish result) -> return (Left result)
-  inputLoop (Left result) _ = return (Left result)
+      (Finish) -> return (Left oldState)
+  inputLoop (Left finalState) _ = return (Left finalState)
 
   run oldState = do
     is <- isIO
     stateOrResult <- foldM inputLoop (Right oldState) is
     case stateOrResult of
       Right newState -> run newState
-      Left result -> return result
+      Left finalState -> return finalState

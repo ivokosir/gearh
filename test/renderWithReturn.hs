@@ -7,7 +7,7 @@ import FRP.Gearh
 renderInput
   :: Window
   -> (s -> Element)
-  -> Input (s -> Output s r)
+  -> Input (s -> Output s)
 renderInput window getElement =
   allways $ return $ \ state -> action $ renderRoot window $ getElement state
 
@@ -20,8 +20,8 @@ data State = State
   , clicks :: Int
   } deriving (Show)
 
-updateEvent :: Event -> State -> Output State Int
-updateEvent Quit state = finish (clicks state)
+updateEvent :: Event -> State -> Output State
+updateEvent Quit _ = finish
 updateEvent (MouseButton _ True _) state =
   updateAndAction newState (print newState)
  where
@@ -60,5 +60,5 @@ main = do
       , renderInput window render
       ]
 
-  clicksReturn <- runGear input initialState
+  clicksReturn <- fmap clicks $ runGear input initialState
   putStrLn ("return value: " ++ show clicksReturn)
