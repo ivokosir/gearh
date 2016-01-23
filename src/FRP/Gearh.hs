@@ -1,19 +1,12 @@
 module FRP.Gearh
   ( Input(..)
-  , merge
   , allways
   , sometimes
   , addIO
-  , Output
-  , update
-  , action
-  , updateAndAction
-  , continue
-  , finish
+  , Output(..)
   , runGear
   ) where
 
-import Control.Monad
 import Data.Maybe
 
 newtype Input i = Input (IO [i])
@@ -21,9 +14,12 @@ newtype Input i = Input (IO [i])
 instance Functor Input where
   fmap f (Input i) = Input $ (fmap . fmap) f i
 
-merge :: [Input a] -> Input a
-merge inputs = Input $
-  fmap concat $ sequence $ fmap (\ (Input i) -> i) inputs
+instance Monoid (Input a) where
+  mempty = Input $ return []
+  mappend (Input i1) (Input i2) = Input $ do
+    a1 <- i1
+    a2 <- i2
+    return $ a1 ++ a2
 
 allways :: IO a -> Input a
 allways io = Input $ fmap (:[]) io
@@ -34,43 +30,28 @@ sometimes io = Input $ fmap maybeToList io
 addIO :: (a -> IO b) -> Input a -> Input b
 addIO io (Input i) = Input $ i >>= mapM io
 
-data Output s
-  = Continue (Maybe s) (Maybe (IO ()))
-  | Finish
+data Output
+  = Output (IO ())
+  | Quit
 
-update :: s -> Output s
-update state = Continue (Just state) Nothing
-
-action :: IO () -> Output s
-action io = Continue Nothing (Just io)
-
-updateAndAction :: s -> IO () -> Output s
-updateAndAction state io = Continue (Just state) (Just io)
-
-continue :: Output s
-continue = Continue Nothing Nothing
-
-finish :: Output s
-finish = Finish
+instance Monoid Output where
+  mempty = Output $ return ()
+  mappend (Output oIO1) (Output oIO2) =
+    Output $ oIO1 >> oIO2
+  mappend o _ = o
 
 runGear
-  :: Input (s -> Output s)
+  :: Input (s -> s)
+  -> (s -> Output)
   -> s
   -> IO s
-runGear (Input isIO) initialState =
+runGear (Input isIO) o initialState =
   run initialState
  where
-  inputLoop (Right oldState) input =
-    case input oldState of
-      (Continue mState mIO) -> do
-        fromMaybe (return ()) mIO
-        return $ Right $ fromMaybe oldState mState
-      (Finish) -> return (Left oldState)
-  inputLoop (Left finalState) _ = return (Left finalState)
-
   run oldState = do
     is <- isIO
-    stateOrResult <- foldM inputLoop (Right oldState) is
-    case stateOrResult of
-      Right newState -> run newState
-      Left finalState -> return finalState
+    let newState = foldl (\ state input -> input state) oldState is
+
+    case o newState of
+      Output oIO -> oIO >> run newState
+      Quit -> return newState
