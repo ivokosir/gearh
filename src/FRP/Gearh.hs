@@ -1,9 +1,12 @@
 module FRP.Gearh
-  ( Input(..)
+  ( Input
   , allways
   , sometimes
+  , manytimes
   , addIO
-  , Output(..)
+  , Output
+  , output
+  , quit
   , runGear
   ) where
 
@@ -27,12 +30,21 @@ allways io = Input $ fmap (:[]) io
 sometimes :: IO (Maybe a) -> Input a
 sometimes io = Input $ fmap maybeToList io
 
+manytimes :: IO [a] -> Input a
+manytimes = Input
+
 addIO :: (a -> IO b) -> Input a -> Input b
 addIO io (Input i) = Input $ i >>= mapM io
 
 data Output
   = Output (IO ())
   | Quit
+
+output :: IO () -> Output
+output = Output
+
+quit :: Output
+quit = Quit
 
 instance Monoid Output where
   mempty = Output $ return ()

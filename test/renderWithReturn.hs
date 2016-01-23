@@ -1,17 +1,15 @@
 module Main where
 
-import Data.Foldable
+import Graphics.Cogh
 
-import Graphics.Cogh as C
-
-import FRP.Gearh as G
+import FRP.Gearh
 
 quitOutput
   :: (s -> Bool)
   -> s -> Output
 quitOutput getQuit state =
   if getQuit state
-    then G.Quit
+    then quit
     else mempty
 
 renderOutput
@@ -19,10 +17,10 @@ renderOutput
   -> (s -> Element)
   -> s -> Output
 renderOutput window getElement state =
-  Output $ renderRoot window $ getElement state
+  output $ renderRoot window $ getElement state
 
 eventInput :: Window -> Input Event
-eventInput = Input . getEvents
+eventInput = manytimes . getEvents
 
 data State = State
   { x :: Int
@@ -32,7 +30,7 @@ data State = State
   } deriving (Show)
 
 updateEvent :: Event -> State -> State
-updateEvent C.Quit state = newState
+updateEvent Quit state = newState
  where
   newState = state { finish = True }
 updateEvent (MouseButton _ True _) state = newState
@@ -66,14 +64,12 @@ main = do
   (Just window) <- newWindow "Test"
 
   let
-    input = fold
-      [ fmap updateEvent (eventInput window)
-      ]
+    i = fmap updateEvent (eventInput window)
 
-    output = fold
+    o = mconcat
       [ quitOutput finish
       , renderOutput window renderScene
       ]
 
-  clicksReturn <- clicks <$> runGear input output initialState
+  clicksReturn <- clicks <$> runGear i o initialState
   putStrLn ("return value: " ++ show clicksReturn)
